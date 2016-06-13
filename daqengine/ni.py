@@ -1000,6 +1000,7 @@ class Engine(object):
     def stop(self):
         for task in self._tasks.values():
             mx.DAQmxStopTask(task)
+            mx.DAQmxClearTask(task)
 
     def ao_write_space_available(self, offset=None):
         try:
