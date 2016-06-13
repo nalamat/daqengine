@@ -16,12 +16,12 @@ def main(device):
     engine.hw_ai_monitor_period = 1
     engine.configure_hw_di(100, '/{}/port0/line0:1'.format(device),
                            names=['poke', 'spout'],
-                           clock='/Dev1/Ctr0')
+                           clock='/{}/Ctr0'.format(device))
     engine.register_di_callback(di_callback)
     engine.register_di_change_callback(change_callback, debounce=10)
     engine.start()
     raw_input('Demo running. Hit enter to exit.\n')
-
+    engine.stop()
 
 if __name__ == '__main__':
     import sys
