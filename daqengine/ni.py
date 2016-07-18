@@ -68,6 +68,10 @@ def channel_info(channels, channel_type):
         mx.DAQmxCreateAIVoltageChan(task, channels, '',
                                     mx.DAQmx_Val_Cfg_Default, -10, 10,
                                     mx.DAQmx_Val_Volts, '')
+    elif channel_type == 'ai2':
+        mx.DAQmxCreateAIVoltageChan(task, channels, '',
+                                    mx.DAQmx_Val_Cfg_Default, -10, 10,
+                                    mx.DAQmx_Val_Volts, '')
 
     channels = ctypes.create_string_buffer('', 4096)
     mx.DAQmxGetTaskChannels(task, channels, len(channels))
@@ -610,6 +614,43 @@ def setup_hw_ai(fs, lines, expected_range, callback, callback_samples,
     return task
 
 
+def setup_hw_ai2(fs, lines, expected_range, callback, callback_samples,
+                start_trigger=None):
+    # Record AI filter delay
+    task = create_task('hw_ai2')
+    lb, ub = expected_range
+    mx.DAQmxCreateAIVoltageChan(task, lines, '', mx.DAQmx_Val_RSE, lb, ub,
+                                mx.DAQmx_Val_Volts, '')
+    setup_timing(task, fs, np.inf, start_trigger)
+
+    result = ctypes.c_uint32()
+    mx.DAQmxGetBufInputBufSize(task, result)
+    buffer_size = result.value
+    mx.DAQmxGetTaskNumChans(task, result)
+    n_channels = result.value
+
+    log.debug('Buffer size for %s automatically allocated as %d samples',
+              lines, buffer_size)
+    log.debug('%d channels in task', n_channels)
+
+    new_buffer_size = np.ceil(buffer_size/callback_samples)*callback_samples
+    mx.DAQmxSetBufInputBufSize(task, int(new_buffer_size))
+
+    callback_helper = SamplesAcquiredCallbackHelper(callback, n_channels)
+    cb_ptr = mx.DAQmxEveryNSamplesEventCallbackPtr(callback_helper)
+    mx.DAQmxRegisterEveryNSamplesEvent(task, mx.DAQmx_Val_Acquired_Into_Buffer,
+                                       int(callback_samples), 0, cb_ptr, None)
+
+    mx.DAQmxTaskControl(task, mx.DAQmx_Val_Task_Commit)
+    rate = ctypes.c_double()
+    mx.DAQmxGetSampClkRate(task, rate)
+    log.debug('AI2 sample rate'.format(rate.value))
+    mx.DAQmxGetSampClkTimebaseRate(task, rate)
+    log.debug('AI2 timebase {}'.format(rate.value))
+    task._cb_ptr = cb_ptr
+    return task
+
+
 def setup_hw_di(fs, lines, callback, callback_samples, start_trigger=None,
                 clock=None):
     '''
@@ -694,6 +735,7 @@ class Engine(object):
     # value. If your application is stalling or freezing, set this to a larger
     # value.
     hw_ai_monitor_period = 0.1
+    hw_ai2_monitor_period = 0.1
 
     # Even though data is written to the analog outputs, it is buffered in
     # computer memory until it's time to be transferred to the onboard buffer of
@@ -778,6 +820,15 @@ class Engine(object):
         task._names = channel_names('ai', lines, names)
         self._tasks['hw_ai'] = task
 
+    def configure_hw_ai2(self, fs, lines, expected_range, names=None,
+                        trigger=None):
+        callback_samples = int(self.hw_ai2_monitor_period*fs)
+        task = setup_hw_ai2(fs, lines, expected_range, self._hw_ai2_callback,
+                           callback_samples, trigger)
+        task._fs = fs
+        task._names = channel_names('ai2', lines, names)
+        self._tasks['hw_ai2'] = task
+
     def configure_sw_ao(self, lines, expected_range, names=None,
                         initial_state=None):
         if initial_state is None:
@@ -857,6 +908,9 @@ class Engine(object):
 
     def register_ai_callback(self, callback):
         self._callbacks.setdefault('ai', []).append(callback)
+
+    def register_ai2_callback(self, callback):
+        self._callbacks.setdefault('ai2', []).append(callback)
 
     def register_di_callback(self, callback):
         self._callbacks.setdefault('di', []).append(callback)
@@ -996,6 +1050,15 @@ class Engine(object):
             generator.send(samples)
         for generator in self._callbacks.get('ai_threshold', []):
             generator.send(samples)
+
+    def _hw_ai2_callback(self, samples):
+        task = self._tasks['hw_ai2']
+        for cb in self._callbacks.get('ai2', []):
+            cb(task._names, samples)
+        # for generator in self._callbacks.get('ai2_epoch', []):
+        #     generator.send(samples)
+        # for generator in self._callbacks.get('ai2_threshold', []):
+        #     generator.send(samples)
 
     def _hw_di_callback(self, samples):
         task = self._tasks['hw_di']
