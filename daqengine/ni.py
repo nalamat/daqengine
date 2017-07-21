@@ -607,7 +607,7 @@ def setup_hw_ai(fs, lines, expected_range, callback, callback_samples,
     mx.DAQmxTaskControl(task, mx.DAQmx_Val_Task_Commit)
     rate = ctypes.c_double()
     mx.DAQmxGetSampClkRate(task, rate)
-    log.debug('AI sample rate'.format(rate.value))
+    log.debug('AI sample rate {}'.format(rate.value))
     mx.DAQmxGetSampClkTimebaseRate(task, rate)
     log.debug('AI timebase {}'.format(rate.value))
     task._cb_ptr = cb_ptr
@@ -781,7 +781,8 @@ class Engine(object):
         # reference.
         self._uint32 = ctypes.c_uint32()
         self._uint64 = ctypes.c_uint64()
-        self._int32 = ctypes.c_int32()
+        self._int32  = ctypes.c_int32()
+        self._double = ctypes.c_double()
 
     def configure_hw_ao(self, fs, lines, expected_range, names=None,
                         start_trigger=None):
@@ -1104,3 +1105,18 @@ class Engine(object):
         task = self._tasks['hw_ao']
         mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
         return self._uint64.value
+
+    def ao_sample_clock_rate(self):
+        task = self._tasks['hw_ao']
+        mx.DAQmxGetSampClkRate(task, self._double)
+        return self._double.value
+
+    def ai_sample_clock(self):
+        task = self._tasks['hw_ai']
+        mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
+        return self._uint64.value
+
+    def ai_sample_clock_rate(self):
+        task = self._tasks['hw_ai']
+        mx.DAQmxGetSampClkRate(task, self._double)
+        return self._double.value
