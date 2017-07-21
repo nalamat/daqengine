@@ -644,7 +644,7 @@ def setup_hw_ai2(fs, lines, expected_range, callback, callback_samples,
     mx.DAQmxTaskControl(task, mx.DAQmx_Val_Task_Commit)
     rate = ctypes.c_double()
     mx.DAQmxGetSampClkRate(task, rate)
-    log.debug('AI2 sample rate'.format(rate.value))
+    log.debug('AI2 sample rate {}'.format(rate.value))
     mx.DAQmxGetSampClkTimebaseRate(task, rate)
     log.debug('AI2 timebase {}'.format(rate.value))
     task._cb_ptr = cb_ptr
@@ -813,19 +813,19 @@ class Engine(object):
         log.info('AO buffer size {} samples'.format(self.hw_ao_buffer_samples))
 
     def configure_hw_ai(self, fs, lines, expected_range, names=None,
-                        trigger=None):
+                        start_trigger=None):
         callback_samples = int(self.hw_ai_monitor_period*fs)
         task = setup_hw_ai(fs, lines, expected_range, self._hw_ai_callback,
-                           callback_samples, trigger)
+                           callback_samples, start_trigger)
         task._fs = fs
         task._names = channel_names('ai', lines, names)
         self._tasks['hw_ai'] = task
 
     def configure_hw_ai2(self, fs, lines, expected_range, names=None,
-                        trigger=None):
+                        start_trigger=None):
         callback_samples = int(self.hw_ai2_monitor_period*fs)
         task = setup_hw_ai2(fs, lines, expected_range, self._hw_ai2_callback,
-                           callback_samples, trigger)
+                           callback_samples, start_trigger)
         task._fs = fs
         task._names = channel_names('ai2', lines, names)
         self._tasks['hw_ai2'] = task
@@ -839,11 +839,11 @@ class Engine(object):
         self._tasks['sw_ao'] = task
         self.write_sw_ao(initial_state)
 
-    def configure_hw_di(self, fs, lines, names=None, trigger=None, clock=None):
+    def configure_hw_di(self, fs, lines, names=None, start_trigger=None, clock=None):
         names = channel_names('digital', lines, names)
         callback_samples = int(self.hw_ai_monitor_period*fs)
         task, clock_task = setup_hw_di(fs, lines, self._hw_di_callback,
-                                       callback_samples, trigger, clock)
+                                       callback_samples, start_trigger, clock)
         task._names = names
         if clock_task is not None:
             self._tasks['hw_di_clock'] = clock_task
