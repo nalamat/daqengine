@@ -1120,3 +1120,12 @@ class Engine(object):
         task = self._tasks['hw_ai']
         mx.DAQmxGetSampClkRate(task, self._double)
         return self._double.value
+
+    def set_ai2_timebase(self, src, rate):
+        '''
+        Use this function to synchronize second DAQ device with the first one
+        Example: engine.set_ai2_timebase('/Dev2/20MHzTimebase', 20e6)
+        '''
+        task = self._tasks['hw_ai2']
+        mx.DAQmxSetSampClkTimebaseSrc(task, src)
+        mx.DAQmxSetSampClkTimebaseRate(task, float(rate))
