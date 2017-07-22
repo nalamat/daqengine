@@ -785,7 +785,7 @@ class Engine(object):
         self._double = ctypes.c_double()
 
     def configure_hw_ao(self, fs, lines, expected_range, names=None,
-                        start_trigger=None):
+                        start_trigger=None, timebase_src=None, timebase_rate=None):
         '''
         Initialize hardware-timed analog output
 
@@ -805,6 +805,9 @@ class Engine(object):
         callback_samples = int(self.hw_ao_monitor_period*fs)
         task = setup_hw_ao(fs, lines, expected_range, self._hw_ao_callback,
                            callback_samples, start_trigger)
+        if timebase_src is not None and timebase_rate is not None:
+            mx.DAQmxSetSampClkTimebaseSrc(task, timebase_src)
+            mx.DAQmxSetSampClkTimebaseRate(task, float(timebase_rate))
         task._names = channel_names('ao', lines, names)
         self._tasks['hw_ao'] = task
 
@@ -813,19 +816,25 @@ class Engine(object):
         log.info('AO buffer size {} samples'.format(self.hw_ao_buffer_samples))
 
     def configure_hw_ai(self, fs, lines, expected_range, names=None,
-                        start_trigger=None):
+                        start_trigger=None, timebase_src=None, timebase_rate=None):
         callback_samples = int(self.hw_ai_monitor_period*fs)
         task = setup_hw_ai(fs, lines, expected_range, self._hw_ai_callback,
                            callback_samples, start_trigger)
+        if timebase_src is not None and timebase_rate is not None:
+            mx.DAQmxSetSampClkTimebaseSrc(task, timebase_src)
+            mx.DAQmxSetSampClkTimebaseRate(task, float(timebase_rate))
         task._fs = fs
         task._names = channel_names('ai', lines, names)
         self._tasks['hw_ai'] = task
 
     def configure_hw_ai2(self, fs, lines, expected_range, names=None,
-                        start_trigger=None):
+                        start_trigger=None, timebase_src=None, timebase_rate=None):
         callback_samples = int(self.hw_ai2_monitor_period*fs)
         task = setup_hw_ai2(fs, lines, expected_range, self._hw_ai2_callback,
-                           callback_samples, start_trigger)
+                            callback_samples, start_trigger)
+        if timebase_src is not None and timebase_rate is not None:
+            mx.DAQmxSetSampClkTimebaseSrc(task, timebase_src)
+            mx.DAQmxSetSampClkTimebaseRate(task, float(timebase_rate))
         task._fs = fs
         task._names = channel_names('ai2', lines, names)
         self._tasks['hw_ai2'] = task
@@ -1120,12 +1129,3 @@ class Engine(object):
         task = self._tasks['hw_ai']
         mx.DAQmxGetSampClkRate(task, self._double)
         return self._double.value
-
-    def set_ai2_timebase(self, src, rate):
-        '''
-        Use this function to synchronize second DAQ device with the first one
-        Example: engine.set_ai2_timebase('/Dev2/20MHzTimebase', 20e6)
-        '''
-        task = self._tasks['hw_ai2']
-        mx.DAQmxSetSampClkTimebaseSrc(task, src)
-        mx.DAQmxSetSampClkTimebaseRate(task, float(rate))
