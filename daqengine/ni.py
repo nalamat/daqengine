@@ -252,7 +252,7 @@ def extract_edges(names, initial_states, min_samples, target):
 def _extract_edges(name, initial_state, min_samples, target):
     if min_samples < 1:
         raise ValueError('min_samples must be greater than 1')
-    prior_samples = np.tile(initial_state, min_samples)
+    prior_samples = np.tile(initial_state, int(min_samples))
     t_prior = -min_samples
     while True:
         # Wait for new data to become available
@@ -270,7 +270,7 @@ def _extract_edges(name, initial_state, min_samples, target):
                 target(name, edge, t_prior + tlb)
 
         t_prior += new_samples.shape[-1]
-        prior_samples = samples[..., -min_samples:]
+        prior_samples = samples[..., -int(min_samples):]
 
 
 @coroutine
