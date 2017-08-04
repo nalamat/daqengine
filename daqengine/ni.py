@@ -26,7 +26,7 @@ from __future__ import print_function
 
 from collections import OrderedDict
 import ctypes
-from threading import Timer
+import threading
 
 import numpy as np
 import PyDAQmx as mx
@@ -758,6 +758,8 @@ class Engine(object):
     # program).
     hw_ao_min_writeahead = hw_ao_onboard_buffer + 1000
 
+    _lock = threading.Lock()
+
     def __init__(self):
         # Use an OrderedDict to ensure that when we loop through the tasks
         # stored in the dictionary, we process them in the order they were
@@ -991,23 +993,24 @@ class Engine(object):
         self._callbacks.setdefault('di_edges', []).append(generator)
 
     def write_hw_ao(self, data, offset=None):
-        task = self._tasks['hw_ao']
-        if offset is not None:
-            # Overwrites data already in the buffer. Used to override changes to
-            # the signal.
-            mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_FirstSample)
-            mx.DAQmxSetWriteOffset(task, offset)
-            log.trace('Writing %d samples starting at %d', data.size, offset)
-        else:
-            # Appends data to the end of the buffer.
-            mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_CurrWritePos)
-            mx.DAQmxSetWriteOffset(task, 0)
-            log.trace('Writing %d samples to end of buffer', data.size)
-        mx.DAQmxWriteAnalogF64(task, data.shape[-1], False, 0,
-                               mx.DAQmx_Val_GroupByChannel,
-                               data.astype(np.float64), self._int32, None)
-        if self._int32.value != data.shape[-1]:
-            raise ValueError('Unable to write all samples to channel')
+        with self._lock:
+            task = self._tasks['hw_ao']
+            if offset is not None:
+                # Overwrites data already in the buffer. Used to override changes to
+                # the signal.
+                mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_FirstSample)
+                mx.DAQmxSetWriteOffset(task, offset)
+                log.trace('Writing %d samples starting at %d', data.size, offset)
+            else:
+                # Appends data to the end of the buffer.
+                mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_CurrWritePos)
+                mx.DAQmxSetWriteOffset(task, 0)
+                log.trace('Writing %d samples to end of buffer', data.size)
+            mx.DAQmxWriteAnalogF64(task, data.shape[-1], False, 0,
+                                   mx.DAQmx_Val_GroupByChannel,
+                                   data.astype(np.float64), self._int32, None)
+            if self._int32.value != data.shape[-1]:
+                raise ValueError('Unable to write all samples to channel')
 
     def write_sw_ao(self, state):
         task = self._tasks['sw_ao']
@@ -1028,11 +1031,12 @@ class Engine(object):
         task._current_state = state
 
     def set_sw_do(self, name, state):
-        task = self._tasks['sw_do']
-        i = task._names.index(name)
-        new_state = task._current_state.copy()
-        new_state[i] = state
-        self.write_sw_do(new_state)
+        with self._lock:
+            task = self._tasks['sw_do']
+            i = task._names.index(name)
+            new_state = task._current_state.copy()
+            new_state[i] = state
+            self.write_sw_do(new_state)
 
     def set_sw_ao(self, name, state):
         task = self._tasks['sw_ao']
@@ -1045,7 +1049,7 @@ class Engine(object):
         # TODO - Store reference to timer so that we can eventually track the
         # state of different timers and cancel pending timers when necessary.
         self.set_sw_do(name, 1)
-        timer = Timer(duration, lambda: self.set_sw_do(name, 0))
+        timer = threading.Timer(duration, lambda: self.set_sw_do(name, 0))
         timer.start()
 
     def _et_fired(self, change, line, event_time):
@@ -1111,21 +1115,25 @@ class Engine(object):
             raise SystemError('No hardware-timed AO task configured')
 
     def ao_sample_clock(self):
-        task = self._tasks['hw_ao']
-        mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
-        return self._uint64.value
+        with self._lock:
+            task = self._tasks['hw_ao']
+            mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
+            return self._uint64.value
 
     def ao_sample_clock_rate(self):
-        task = self._tasks['hw_ao']
-        mx.DAQmxGetSampClkRate(task, self._double)
-        return self._double.value
+        with self._lock:
+            task = self._tasks['hw_ao']
+            mx.DAQmxGetSampClkRate(task, self._double)
+            return self._double.value
 
     def ai_sample_clock(self):
-        task = self._tasks['hw_ai']
-        mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
-        return self._uint64.value
+        with self._lock:
+            task = self._tasks['hw_ai']
+            mx.DAQmxGetWriteTotalSampPerChanGenerated(task, self._uint64)
+            return self._uint64.value
 
     def ai_sample_clock_rate(self):
-        task = self._tasks['hw_ai']
-        mx.DAQmxGetSampClkRate(task, self._double)
-        return self._double.value
+        with self._lock:
+            task = self._tasks['hw_ai']
+            mx.DAQmxGetSampClkRate(task, self._double)
+            return self._double.value
