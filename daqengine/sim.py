@@ -9,12 +9,15 @@ import time
 import threading
 import traceback
 import numpy as np
+
 from collections import OrderedDict
+from traits.api import HasTraits, Range, List, Bool, Int, on_trait_change, Button, Instance
+from traitsui.api import View, Action, Item, CheckListEditor
 
 import logging
 log = logging.getLogger(__name__)
 
-class Engine(object):
+class Engine(HasTraits):
     '''
     Simulator interface
     '''
@@ -53,14 +56,29 @@ class Engine(object):
     # program).
     hw_ao_min_writeahead = hw_ao_onboard_buffer + 1000
 
+    hw_di_names = List
+    hw_di_state = List
+
+    sw_do_names = List
+    sw_do_state = List
+
     def __init__(self):
         # Use an OrderedDict to ensure that when we loop through the tasks
         # stored in the dictionary, we process them in the order they were
         # configured.
         self._tasks = OrderedDict()
-        self._callbacks = {}
-        self._timers = {}
 
+        self._view = View(
+            Item('hw_di_state', label='Digital input' , editor=CheckListEditor(name='hw_di_names',cols=8), style='custom'),
+            Item('sw_do_state', label='Digital output', editor=CheckListEditor(name='sw_do_names',cols=8), style='custom'),
+            title='DAQ Engine Simulator',
+            resizable=True,
+            kind='live'
+        )
+
+    @on_trait_change('hw_di_state')
+    def _hw_di_state_changed(self, name, old, new):
+        pass
 
     def configure_hw_ao(self, fs, lines, expected_range, names=None,
                         start_trigger=None, timebase_src=None, timebase_rate=None):
@@ -92,12 +110,14 @@ class Engine(object):
         task = {'thread':thread, 'thread_stop':False, 'fs':fs, 'names':names,
             'callbacks':[], 'callback_samples':callback_samples}
         self._tasks['hw_di'] = task
+        self.hw_di_names = names
 
     def configure_sw_do(self, lines, names=None, initial_state=None):
         if initial_state is None:
             initial_state = np.zeros(len(names), dtype=np.uint8)
         task = {'names':names, 'state':initial_state}
         self._tasks['sw_do'] = task
+        self.sw_do_names = names
 
 
     def register_ao_callback(self, callback):
@@ -220,6 +240,7 @@ class Engine(object):
         for task in self._tasks.values():
             if 'thread' in task:
                 task['thread'].start()
+        self.configure_traits(view=self._view)
 
     def stop(self):
         for task in self._tasks.values():
