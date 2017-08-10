@@ -12,7 +12,7 @@ import numpy as np
 
 from collections import OrderedDict
 from traits.api import HasTraits, Range, List, Bool, Int, on_trait_change, Button, Instance
-from traitsui.api import View, Action, Item, CheckListEditor
+from traitsui.api import View, Action, Item, CheckListEditor, Controller
 
 import logging
 log = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ class Engine(HasTraits):
             Item('hw_di_state', label='Digital input' , editor=CheckListEditor(name='hw_di_names',cols=8), style='custom'),
             Item('sw_do_state', label='Digital output', editor=CheckListEditor(name='sw_do_names',cols=8), style='custom'),
             title='DAQ Engine Simulator',
+            handler=Controller(),
             resizable=True,
             kind='live'
         )
@@ -247,6 +248,7 @@ class Engine(HasTraits):
             if 'thread' in task:
                 task['thread_stop'] = True
                 task['thread'].join()
+        self._view.handler.info.ui.dispose()
 
 
     def ao_sample_clock(self):
