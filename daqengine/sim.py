@@ -77,9 +77,6 @@ class Engine(HasTraits):
             kind='live'
         )
 
-    @on_trait_change('hw_di_state')
-    def _hw_di_state_changed(self, name, old, new):
-        pass
 
     def configure_hw_ao(self, fs, lines, expected_range, names=None,
                         start_trigger=None, timebase_src=None, timebase_rate=None):
@@ -106,10 +103,7 @@ class Engine(HasTraits):
         self._tasks['hw_ai2'] = task
 
     def configure_hw_di(self, fs, lines, names=None, start_trigger=None, clock=None):
-        callback_samples = int(self.hw_ai_monitor_period*fs)
-        thread = threading.Thread(target=self._thread_loop_hw_di, args=[])
-        task = {'thread':thread, 'thread_stop':False, 'fs':fs, 'names':names,
-            'callbacks':[], 'callback_samples':callback_samples}
+        task = {'fs':fs, 'names':names, 'callbacks':[]}
         self._tasks['hw_di'] = task
         self.hw_di_names = names
 
@@ -136,23 +130,6 @@ class Engine(HasTraits):
 
     def write_hw_ao(self, data, offset=None):
         pass
-        # task = self._tasks['hw_ao']
-        # if offset is not None:
-        #     # Overwrites data already in the buffer. Used to override changes to
-        #     # the signal.
-        #     mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_FirstSample)
-        #     mx.DAQmxSetWriteOffset(task, offset)
-        #     log.trace('Writing %d samples starting at %d', data.size, offset)
-        # else:
-        #     # Appends data to the end of the buffer.
-        #     mx.DAQmxSetWriteRelativeTo(task, mx.DAQmx_Val_CurrWritePos)
-        #     mx.DAQmxSetWriteOffset(task, 0)
-        #     log.trace('Writing %d samples to end of buffer', data.size)
-        # mx.DAQmxWriteAnalogF64(task, data.shape[-1], False, 0,
-        #                        mx.DAQmx_Val_GroupByChannel,
-        #                        data.astype(np.float64), self._int32, None)
-        # if self._int32.value != data.shape[-1]:
-        #     raise ValueError('Unable to write all samples to channel')
 
     def write_sw_do(self, state):
         task = self._tasks['sw_do']
@@ -224,16 +201,23 @@ class Engine(HasTraits):
             print(traceback.format_exc())
             print('Exiting _thread_loop_hw_ai2')
 
-    def _thread_loop_hw_di(self):
-        try:
-            task = self._tasks['hw_di']
-            while not task['thread_stop']:
-                # for cb in task['callbacks']:
-                #     cb(name, change, timestamp)
-                time.sleep(0.001)
-        except:
-            print(traceback.format_exc())
-            print('Exiting _thread_loop_hw_di')
+    def _hw_di_state_changed(self, object, old, new):
+        task = self._tasks['hw_di']
+        timestamp = time.time() - self.start_time
+        timestamp *= task['fs']
+        diff1 = list(set(new)-set(old))
+        diff2 = list(set(old)-set(new))
+        if len(diff1):
+            name = diff1[0]
+            change = 'rising'
+        elif len(diff2):
+            name = diff2[0]
+            change = 'falling'
+        else:
+            return
+        task
+        for cb in task['callbacks']:
+            cb(name, change, timestamp)
 
 
     def start(self):
@@ -248,7 +232,8 @@ class Engine(HasTraits):
             if 'thread' in task:
                 task['thread_stop'] = True
                 task['thread'].join()
-        self._view.handler.info.ui.dispose()
+        try: self._view.handler.info.ui.dispose()
+        except: pass
 
 
     def ao_sample_clock(self):
