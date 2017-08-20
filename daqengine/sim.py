@@ -136,6 +136,11 @@ class Engine(HasTraits):
         state = np.asarray(state).astype(np.uint8)
         task['state'] = state
 
+    def get_sw_do(self, name):
+        task = self._tasks['sw_do']
+        i = task['names'].index(name)
+        return task['state'][i]
+
     def set_sw_do(self, name, state):
         task = self._tasks['sw_do']
         i = task['names'].index(name)

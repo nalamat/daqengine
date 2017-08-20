@@ -1038,12 +1038,12 @@ class Engine(object):
             new_state[i] = state
             self.write_sw_do(new_state)
 
-    def set_sw_ao(self, name, state):
-        task = self._tasks['sw_ao']
-        i = task._names.index(name)
-        new_state = task._current_state.copy()
-        new_state[i] = state
-        self.write_sw_ao(new_state)
+    def get_sw_do(self, name):
+        with self._lock:
+            task = self._tasks['sw_do']
+            i = task._names.index(name)
+            state = task._current_state.copy()
+            return state[i]
 
     def fire_sw_do(self, name, duration=0.1):
         # TODO - Store reference to timer so that we can eventually track the
