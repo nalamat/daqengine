@@ -526,7 +526,7 @@ def setup_hw_ao(fs, lines, expected_range, callback, callback_samples,
     # provided, do not loop around to the beginning and start over.
     mx.DAQmxSetWriteRegenMode(task, mx.DAQmx_Val_DoNotAllowRegen)
 
-    mx.DAQmxSetBufOutputBufSize(task, int(callback_samples*100))
+    mx.DAQmxSetBufOutputBufSize(task, int(callback_samples*10))
 
     result = ctypes.c_uint32()
     mx.DAQmxGetTaskNumChans(task, result)
@@ -727,7 +727,7 @@ class Engine(object):
     # outputs are notified (i.e., to generate additional samples for playout).
     # If the poll period is too long, then the analog output may run out of
     # samples.
-    hw_ao_monitor_period = 1
+    hw_ao_monitor_period = 10
 
     # Poll period (in seconds). This defines how quickly acquired (analog input)
     # data is downloaded from the buffers (and made available to listeners). If
